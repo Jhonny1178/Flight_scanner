@@ -1,0 +1,47 @@
+name: Automated Charter Flight Scanner
+
+on:
+  schedule:
+    # Runs every 3 hours (at minute 0 past every 3rd hour)
+    - cron: '0 */3 * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  scrape-and-alert:
+    name: Run Flight Scraper & Alert
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f flight_scanner/requirements.txt ]; then
+            pip install -r flight_scanner/requirements.txt
+          elif [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
+      - name: Run flight scanner pipeline
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          PRICE_THRESHOLD: ${{ secrets.PRICE_THRESHOLD || '500.0' }}
+          API_ENDPOINT_URL: ${{ secrets.API_ENDPOINT_URL }}
+          REQUEST_TIMEOUT_SECONDS: '20'
+          MAX_RETRIES: '3'
+          LOG_LEVEL: 'INFO'
+        run: |
+          if [ -f flight_scanner/main.py ]; then
+            python flight_scanner/main.py
+          else
+            python main.py
+          fi

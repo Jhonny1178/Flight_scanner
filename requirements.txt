@@ -1,0 +1,12 @@
+# Core HTTP requests
+requests>=2.31.0
+
+# Environment variable loading
+python-dotenv>=1.0.1
+
+# Type checking stubs
+types-requests>=2.31.0
+
+# Testing
+pytest>=8.0.0
+pytest-mock>=3.12.0
