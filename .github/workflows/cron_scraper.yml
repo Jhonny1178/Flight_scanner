@@ -2,7 +2,7 @@ name: Automated Charter Flight Scanner
 
 on:
   schedule:
-    # Runs every 3 hours (at minute 0 past every 3rd hour)
+    # Runs automatically every 3 hours (at minute 0 past every 3rd hour)
     - cron: '0 */3 * * *'
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
@@ -24,24 +24,23 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f flight_scanner/requirements.txt ]; then
-            pip install -r flight_scanner/requirements.txt
-          elif [ -f requirements.txt ]; then
+          if [ -f requirements.txt ]; then
             pip install -r requirements.txt
+          elif [ -f flight_scanner/requirements.txt ]; then
+            pip install -r flight_scanner/requirements.txt
           fi
 
       - name: Run flight scanner pipeline
         env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-          PRICE_THRESHOLD: ${{ secrets.PRICE_THRESHOLD || '500.0' }}
-          API_ENDPOINT_URL: ${{ secrets.API_ENDPOINT_URL }}
+          PRICE_THRESHOLD: ${{ secrets.PRICE_THRESHOLD || '2500.0' }}
+          RAINBOW_API_ENDPOINT_URL: ${{ secrets.RAINBOW_API_ENDPOINT_URL || 'https://r.pl/api/czartery/wyszukiwanie/v4.1/wyszukaj' }}
+          TUI_API_ENDPOINT_URL: ${{ secrets.TUI_API_ENDPOINT_URL || 'https://www.tui.pl/api/flight/search' }}
           REQUEST_TIMEOUT_SECONDS: '20'
           MAX_RETRIES: '3'
           LOG_LEVEL: 'INFO'
         run: |
-          if [ -f flight_scanner/main.py ]; then
-            python flight_scanner/main.py
-          else
-            python main.py
-          fi
+          python flight_scanner/main.py

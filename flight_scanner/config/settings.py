@@ -35,6 +35,8 @@ class Settings:
     chat_id: str
     price_threshold: float
     api_endpoint_url: str
+    rainbow_api_endpoint_url: str = "https://r.pl/api/czartery/wyszukiwanie/v4.1/wyszukaj"
+    tui_api_endpoint_url: str = "https://www.tui.pl/api/flight/search"
     request_timeout_seconds: int = 15
     max_retries: int = 3
     retry_backoff_factor: float = 1.0
@@ -63,7 +65,7 @@ class Settings:
             raise ValueError(
                 f"MAX_RETRIES cannot be negative, got {self.max_retries}"
             )
-        if not self.api_endpoint_url:
+        if not self.api_endpoint_url and not self.rainbow_api_endpoint_url:
             raise ValueError("API_ENDPOINT_URL must not be empty.")
 
 
@@ -89,10 +91,18 @@ def load_settings(env_file: Optional[Path] = None) -> Settings:
                 "python-dotenv not installed, reading from os.environ directly."
             )
 
-    telegram_token = os.getenv("TELEGRAM_TOKEN", "").strip()
-    chat_id = os.getenv("CHAT_ID", "").strip()
+    telegram_token = (
+        os.getenv("TELEGRAM_BOT_TOKEN")
+        or os.getenv("TELEGRAM_TOKEN")
+        or ""
+    ).strip()
+    chat_id = (
+        os.getenv("TELEGRAM_CHAT_ID")
+        or os.getenv("CHAT_ID")
+        or ""
+    ).strip()
 
-    price_threshold_raw = os.getenv("PRICE_THRESHOLD", "500.0").strip()
+    price_threshold_raw = os.getenv("PRICE_THRESHOLD", "2500.0").strip()
     try:
         price_threshold = float(price_threshold_raw)
     except ValueError as err:
@@ -102,7 +112,17 @@ def load_settings(env_file: Optional[Path] = None) -> Settings:
 
     api_endpoint_url = os.getenv(
         "API_ENDPOINT_URL",
-        "https://api.example.com/charter-flights",
+        "https://www.tui.pl/api/flight/search",
+    ).strip()
+
+    rainbow_api_endpoint_url = os.getenv(
+        "RAINBOW_API_ENDPOINT_URL",
+        "https://r.pl/api/czartery/wyszukiwanie/v4.1/wyszukaj",
+    ).strip()
+
+    tui_api_endpoint_url = os.getenv(
+        "TUI_API_ENDPOINT_URL",
+        api_endpoint_url,
     ).strip()
 
     timeout_raw = os.getenv("REQUEST_TIMEOUT_SECONDS", "15").strip()
@@ -137,6 +157,8 @@ def load_settings(env_file: Optional[Path] = None) -> Settings:
         chat_id=chat_id,
         price_threshold=price_threshold,
         api_endpoint_url=api_endpoint_url,
+        rainbow_api_endpoint_url=rainbow_api_endpoint_url,
+        tui_api_endpoint_url=tui_api_endpoint_url,
         request_timeout_seconds=request_timeout_seconds,
         max_retries=max_retries,
         retry_backoff_factor=retry_backoff_factor,

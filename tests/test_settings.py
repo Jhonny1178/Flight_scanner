@@ -50,3 +50,21 @@ def test_load_settings_from_env(monkeypatch):
     assert settings.chat_id == "999888"
     assert settings.price_threshold == 350.50
     assert settings.api_endpoint_url == "https://api.flights.mock/deals"
+
+
+def test_load_settings_default_price_threshold(monkeypatch):
+    monkeypatch.delenv("PRICE_THRESHOLD", raising=False)
+    monkeypatch.setenv("TELEGRAM_TOKEN", "mock_bot_token")
+    monkeypatch.setenv("CHAT_ID", "999888")
+    settings = load_settings()
+    assert settings.price_threshold == 2500.0
+
+
+def test_load_settings_telegram_bot_token_and_chat_id(monkeypatch):
+    monkeypatch.delenv("TELEGRAM_TOKEN", raising=False)
+    monkeypatch.delenv("CHAT_ID", raising=False)
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot_token_via_gh_secret")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat_id_via_gh_secret")
+    settings = load_settings()
+    assert settings.telegram_token == "bot_token_via_gh_secret"
+    assert settings.chat_id == "chat_id_via_gh_secret"

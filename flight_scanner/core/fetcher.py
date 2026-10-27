@@ -1,7 +1,8 @@
 """Resilient HTTP client wrapper for fetching flight API payloads.
 
-Provides configurable timeout, retry logic with exponential backoff, and robust
-exception handling for network and JSON decoding failures.
+Provides configurable timeout, retry logic with exponential backoff, support
+for GET and POST methods with query parameters and JSON payloads, cookie
+control, and robust exception handling.
 """
 
 from __future__ import annotations
@@ -70,63 +71,97 @@ class HTTPFetcher:
     def fetch_json(
         self,
         url: str,
+        method: str = "GET",
         params: Optional[Dict[str, Any]] = None,
+        json_data: Optional[Dict[str, Any]] = None,
+        data: Optional[Any] = None,
         headers: Optional[Dict[str, str]] = None,
+        send_cookies: bool = True,
     ) -> Optional[Dict[str, Any]]:
-        """Performs a GET request and parses the JSON response body.
+        """Executes an HTTP request (GET or POST) and parses the JSON response body.
 
         Catches RequestException and JSONDecodeError cleanly without crashing,
         logging failure context to assist operational observability.
 
         Args:
             url: The HTTP/HTTPS endpoint to query.
-            params: Optional query parameters.
-            headers: Optional additional request headers.
+            method: HTTP method ('GET' or 'POST'). Defaults to 'GET'.
+            params: Optional query parameters passed to the request URL.
+            json_data: Optional JSON serializable dictionary for POST request body.
+            data: Optional raw payload for POST request body.
+            headers: Optional additional request headers (e.g. x-source, custom user-agent).
+            send_cookies: If False, strips and clears cookies before/after request.
 
         Returns:
             Decoded JSON dictionary if successful, or None if the request failed.
         """
+        http_method = method.strip().upper()
         req_headers = {"Accept": "application/json"}
         if headers:
             req_headers.update(headers)
 
-        logger.debug("Requesting URL: %s with params: %s", url, params)
+        if not send_cookies:
+            self.session.cookies.clear()
+
+        logger.debug(
+            "Executing %s request to %s with params: %s, has_json: %s, send_cookies: %s",
+            http_method,
+            url,
+            params,
+            bool(json_data),
+            send_cookies,
+        )
 
         try:
-            response = self.session.get(
-                url=url,
-                params=params,
-                headers=req_headers,
-                timeout=self.timeout,
-            )
+            if http_method == "POST":
+                response = self.session.post(
+                    url=url,
+                    params=params,
+                    json=json_data,
+                    data=data,
+                    headers=req_headers,
+                    timeout=self.timeout,
+                )
+            else:
+                response = self.session.get(
+                    url=url,
+                    params=params,
+                    headers=req_headers,
+                    timeout=self.timeout,
+                )
+
+            if not send_cookies:
+                self.session.cookies.clear()
 
             # Check HTTP status code
             if response.status_code >= 400:
                 logger.error(
-                    "HTTP %d error when fetching %s. Response preview: %s",
+                    "HTTP %d error when fetching %s via %s. Response preview: %s",
                     response.status_code,
                     url,
+                    http_method,
                     response.text[:300],
                 )
                 return None
 
             # Attempt JSON decoding
-            data = response.json()
-            if not isinstance(data, dict):
+            body = response.json()
+            if not isinstance(body, dict):
                 logger.warning(
                     "Unexpected JSON root type from %s: expected dict, received %s",
                     url,
-                    type(data).__name__,
+                    type(body).__name__,
                 )
-                return {"results": data} if isinstance(data, list) else None
+                return {"results": body} if isinstance(body, list) else None
 
             logger.info("Successfully fetched and decoded JSON from %s", url)
-            return data
+            return body
 
         except requests.exceptions.Timeout as timeout_err:
             logger.error(
-                "Request timeout (%ds) exceeded for URL %s: %s",
+                "Request timeout (%ds) exceeded for %s %s: %s",
                 self.timeout,
+                http_method,
                 url,
                 timeout_err,
             )
@@ -134,7 +169,8 @@ class HTTPFetcher:
 
         except requests.exceptions.ConnectionError as conn_err:
             logger.error(
-                "Connection failed when reaching %s: %s",
+                "Connection failed when reaching %s %s: %s",
+                http_method,
                 url,
                 conn_err,
             )
@@ -151,11 +187,46 @@ class HTTPFetcher:
 
         except requests.exceptions.RequestException as req_err:
             logger.error(
-                "Generic requests failure when requesting %s: %s",
+                "Generic requests failure when requesting %s %s: %s",
+                http_method,
                 url,
                 req_err,
             )
             return None
+
+    def get_json(
+        self,
+        url: str,
+        params: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
+        send_cookies: bool = True,
+    ) -> Optional[Dict[str, Any]]:
+        """Convenience wrapper for GET requests with query parameters."""
+        return self.fetch_json(
+            url=url,
+            method="GET",
+            params=params,
+            headers=headers,
+            send_cookies=send_cookies,
+        )
+
+    def post_json(
+        self,
+        url: str,
+        json_data: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
+        send_cookies: bool = True,
+    ) -> Optional[Dict[str, Any]]:
+        """Convenience wrapper for POST requests with JSON payload."""
+        return self.fetch_json(
+            url=url,
+            method="POST",
+            params=params,
+            json_data=json_data,
+            headers=headers,
+            send_cookies=send_cookies,
+        )
 
     def close(self) -> None:
         """Closes the underlying requests session."""

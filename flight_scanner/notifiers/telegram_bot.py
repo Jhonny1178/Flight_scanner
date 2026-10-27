@@ -58,6 +58,7 @@ class TelegramNotifier:
         """
         origin = html.escape(str(deal.get("origin", "N/A")))
         destination = html.escape(str(deal.get("destination", "N/A")))
+        route = deal.get("route")
         departure_date = html.escape(str(deal.get("departure_date", "N/A")))
         return_date = deal.get("return_date")
         price = deal.get("price", 0.0)
@@ -65,10 +66,16 @@ class TelegramNotifier:
         operator = html.escape(str(deal.get("airline_or_operator", "Charter")))
         booking_url = str(deal.get("booking_url", "")).strip()
 
+        if route and str(route).strip():
+            safe_route = html.escape(str(route).strip())
+            route_line = f"📍 <b>Route:</b> {safe_route} ({origin} ➔ <b>{destination}</b>)"
+        else:
+            route_line = f"📍 <b>Route:</b> {origin} ➔ <b>{destination}</b>"
+
         lines = [
             "✈️ <b>LAST-MINUTE CHARTER DEAL FOUND!</b>",
             "─────────────────────────────",
-            f"📍 <b>Route:</b> {origin} ➔ <b>{destination}</b>",
+            route_line,
             f"📅 <b>Departure:</b> {departure_date}",
         ]
 
