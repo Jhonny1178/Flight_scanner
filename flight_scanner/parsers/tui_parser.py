@@ -100,12 +100,22 @@ class TUICharterParser(BaseFlightParser):
                     or "TUI Charter"
                 ).strip()
 
-                booking_url = str(
-                    item.get("booking_url")
-                    or item.get("url")
-                    or item.get("link")
-                    or self.DEFAULT_BOOKING_URL
-                ).strip()
+                # Dynamic Deep Link URL
+                airport_code = str(
+                    item.get("airportCode")
+                    or item.get("arrivalAirport")
+                    or destination
+                    or ""
+                ).strip().upper()
+
+                if item.get("booking_url") or item.get("url") or item.get("link"):
+                    booking_url = str(
+                        item.get("booking_url") or item.get("url") or item.get("link")
+                    ).strip()
+                elif airport_code:
+                    booking_url = f"https://www.tui.pl/bilety-lotnicze?q={airport_code}"
+                else:
+                    booking_url = self.DEFAULT_BOOKING_URL
 
                 route = f"{origin} - {destination}"
 

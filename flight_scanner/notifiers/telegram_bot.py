@@ -49,9 +49,10 @@ class TelegramNotifier:
         """Formats a single flight deal dictionary into a Telegram HTML message.
 
         Safely escapes user-controlled strings to prevent HTML tag injection.
+        Includes regional cap and destination region if injected by FlightFilter.
 
         Args:
-            deal: Flight offer dictionary.
+            deal: Flight offer dictionary (may include _region, _region_cap keys).
 
         Returns:
             HTML formatted string ready for Telegram dispatch.
@@ -66,30 +67,46 @@ class TelegramNotifier:
         operator = html.escape(str(deal.get("airline_or_operator", "Charter")))
         booking_url = str(deal.get("booking_url", "")).strip()
 
+        # Optional region metadata stamped by FlightFilter
+        region_raw = deal.get("_region")
+        region_cap = deal.get("_region_cap")
+
+        if region_raw == "ASIA":
+            region_label = "🌏 Azja"
+        elif region_raw == "AFRICA_AMERICA":
+            region_label = "🌍 Afryka / Ameryki"
+        else:
+            region_label = None
+
         if route and str(route).strip():
             safe_route = html.escape(str(route).strip())
-            route_line = f"📍 <b>Route:</b> {safe_route} ({origin} ➔ <b>{destination}</b>)"
+            route_line = f"📍 <b>Trasa:</b> {safe_route} ({origin} ➔ <b>{destination}</b>)"
         else:
-            route_line = f"📍 <b>Route:</b> {origin} ➔ <b>{destination}</b>"
+            route_line = f"📍 <b>Trasa:</b> {origin} ➔ <b>{destination}</b>"
 
         lines = [
-            "✈️ <b>LAST-MINUTE CHARTER DEAL FOUND!</b>",
+            "✈️ <b>OFERTA LAST-MINUTE ZNALEZIONA!</b>",
             "─────────────────────────────",
             route_line,
-            f"📅 <b>Departure:</b> {departure_date}",
+            f"📅 <b>Wylot:</b> {departure_date}",
         ]
 
         if return_date:
-            lines.append(f"🔙 <b>Return:</b> {html.escape(str(return_date))}")
+            lines.append(f"🔙 <b>Powrót:</b> {html.escape(str(return_date))}")
 
-        lines.extend([
-            f"💰 <b>Price:</b> <code>{price:.2f} {currency}</code>",
-            f"🏢 <b>Operator:</b> {operator}",
-        ])
+        lines.append(f"💰 <b>Cena:</b> <code>{price:.2f} {currency}</code>")
+
+        if region_label:
+            lines.append(f"🗺 <b>Region:</b> {region_label}")
+
+        if region_cap is not None:
+            lines.append(f"🎯 <b>Limit cenowy regionu:</b> <code>{region_cap:.0f} {currency}</code>")
+
+        lines.append(f"🏢 <b>Operator:</b> {operator}")
 
         if booking_url and booking_url != "#":
             safe_url = html.escape(booking_url, quote=True)
-            lines.append(f"🔗 <a href=\"{safe_url}\"><b>Book Flight Now</b></a>")
+            lines.append(f"🔗 <a href=\"{safe_url}\"><b>Zarezerwuj lot teraz</b></a>")
 
         lines.append("─────────────────────────────")
         return "\n".join(lines)

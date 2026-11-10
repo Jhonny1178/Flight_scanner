@@ -31,7 +31,8 @@ def test_rainbow_parser_extracts_exact_fields():
     assert offer["operator"] == "Rainbow (Enter Air)" or offer["airline_or_operator"] == "Rainbow (Enter Air)"
     assert offer["route"] == "Madera KTW - FNC"
     assert offer["departure_date"] == "2026-10-31"
-    assert offer["booking_url"] == "https://r.pl/bilety-czarterowe/szukaj"
+    assert offer["booking_url"] == "https://r.pl/bilety-czarterowe/szukaj?przylot=FNC"
+    assert offer["url"] == "https://r.pl/bilety-czarterowe/szukaj?przylot=FNC"
     assert offer["origin"] == "KTW"
     assert offer["destination"] == "FNC"
 
@@ -60,6 +61,8 @@ def test_rainbow_parser_fallback_route_when_datalayer_name_missing():
     assert offer["route"] == "Gran Canaria (LPA)"
     assert offer["destination"] == "LPA"
     assert offer["departure_date"] == "2026-11-03"
+    assert offer["booking_url"] == "https://r.pl/bilety-czarterowe/szukaj?przylot=LPA"
+    assert offer["url"] == "https://r.pl/bilety-czarterowe/szukaj?przylot=LPA"
 
 
 def test_rainbow_parser_skips_missing_mandatory_fields():
@@ -93,6 +96,37 @@ def test_rainbow_parser_skips_missing_mandatory_fields():
     assert len(offers) == 1
     assert offers[0]["destination"] == "DJE"
     assert offers[0]["price"] == 650.0
+
+
+def test_rainbow_parser_direct_seo_path():
+    parser = RainbowCharterParser()
+    raw_payload = {
+        "Destynacje": [
+            {
+                "Panstwo": "Tajlandia",
+                "Nazwa": "Bangkok",
+                "PanstwoUrl": "tajlandia",
+                "NazwaUrl": "bangkok",
+                "Klucz": "BKK",
+                "TerminWyjazdu": "2026-11-20T00:00:00Z",
+                "Cena": 980,
+                "DataLayer": {
+                    "brand": "Enter Air",
+                    "name": "Bangkok WAW - BKK",
+                    "id": 888,
+                },
+            }
+        ]
+    }
+
+    offers = parser.parse_offers(raw_payload)
+    assert len(offers) == 1
+    offer = offers[0]
+    expected_seo_url = "https://r.pl/bilety-czarterowe/tajlandia/bangkok"
+    assert offer["booking_url"] == expected_seo_url
+    assert offer["url"] == expected_seo_url
+    assert offer["destination"] == "BKK"
+    assert offer["price"] == 980.0
 
 
 def test_rainbow_parser_handles_empty_or_non_dict_payload():

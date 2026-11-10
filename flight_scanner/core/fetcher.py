@@ -17,6 +17,13 @@ from urllib3.util import Retry
 
 logger = logging.getLogger(__name__)
 
+# Default query parameters for Rainbow Tours one-way charter API searches
+RAINBOW_ONE_WAY_PARAMS: Dict[str, str] = {
+    "oneWay": "true",
+    "dataUrodzenia": "1996-10-26",
+    "sortowanie": "cena",
+}
+
 
 class HTTPFetcher:
     """Robust HTTP client with built-in retry mechanism and error handling."""

@@ -3,7 +3,7 @@
 import json
 from unittest.mock import MagicMock, patch
 import requests
-from flight_scanner.core.fetcher import HTTPFetcher
+from flight_scanner.core.fetcher import HTTPFetcher, RAINBOW_ONE_WAY_PARAMS
 
 
 def test_fetch_json_success():
@@ -23,7 +23,7 @@ def test_fetch_json_get_with_params_and_headers():
     mock_resp.status_code = 200
     mock_resp.json.return_value = {"Destynacje": []}
 
-    params = {"oneWay": "false", "dataUrodzenia": "1996-10-26", "sortowanie": "cena"}
+    params = {"oneWay": "true", "dataUrodzenia": "1996-10-26", "sortowanie": "cena"}
     headers = {"x-source": "r.pl", "user-agent": "CustomUA"}
 
     with patch.object(fetcher.session, "get", return_value=mock_resp) as mock_get:
@@ -98,3 +98,10 @@ def test_fetch_json_decode_error():
     with patch.object(fetcher.session, "get", return_value=mock_resp):
         result = fetcher.fetch_json("https://api.test/flights")
         assert result is None
+
+
+def test_rainbow_one_way_parameters():
+    assert RAINBOW_ONE_WAY_PARAMS.get("oneWay") == "true"
+    assert "dataUrodzenia" in RAINBOW_ONE_WAY_PARAMS
+    assert "sortowanie" in RAINBOW_ONE_WAY_PARAMS
+

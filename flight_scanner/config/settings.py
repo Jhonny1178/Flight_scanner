@@ -26,6 +26,10 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+MAX_DAYS_AHEAD: int = 21
+ASIA_PRICE_CAP: float = 1000.0
+AFRICA_AMERICA_PRICE_CAP: float = 1500.0
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -37,6 +41,9 @@ class Settings:
     api_endpoint_url: str
     rainbow_api_endpoint_url: str = "https://r.pl/api/czartery/wyszukiwanie/v4.1/wyszukaj"
     tui_api_endpoint_url: str = "https://www.tui.pl/api/flight/search"
+    max_days_ahead: int = MAX_DAYS_AHEAD
+    asia_price_cap: float = ASIA_PRICE_CAP
+    africa_america_price_cap: float = AFRICA_AMERICA_PRICE_CAP
     request_timeout_seconds: int = 15
     max_retries: int = 3
     retry_backoff_factor: float = 1.0
@@ -56,6 +63,18 @@ class Settings:
         if self.price_threshold <= 0:
             raise ValueError(
                 f"PRICE_THRESHOLD must be greater than 0, got {self.price_threshold}"
+            )
+        if self.max_days_ahead <= 0:
+            raise ValueError(
+                f"MAX_DAYS_AHEAD must be positive, got {self.max_days_ahead}"
+            )
+        if self.asia_price_cap <= 0:
+            raise ValueError(
+                f"ASIA_PRICE_CAP must be positive, got {self.asia_price_cap}"
+            )
+        if self.africa_america_price_cap <= 0:
+            raise ValueError(
+                f"AFRICA_AMERICA_PRICE_CAP must be positive, got {self.africa_america_price_cap}"
             )
         if self.request_timeout_seconds <= 0:
             raise ValueError(
@@ -125,6 +144,30 @@ def load_settings(env_file: Optional[Path] = None) -> Settings:
         api_endpoint_url,
     ).strip()
 
+    max_days_ahead_raw = os.getenv("MAX_DAYS_AHEAD", str(MAX_DAYS_AHEAD)).strip()
+    try:
+        max_days_ahead = int(max_days_ahead_raw)
+    except ValueError as err:
+        raise ValueError(
+            f"Invalid integer for MAX_DAYS_AHEAD: '{max_days_ahead_raw}'"
+        ) from err
+
+    asia_cap_raw = os.getenv("ASIA_PRICE_CAP", str(ASIA_PRICE_CAP)).strip()
+    try:
+        asia_price_cap = float(asia_cap_raw)
+    except ValueError as err:
+        raise ValueError(
+            f"Invalid float for ASIA_PRICE_CAP: '{asia_cap_raw}'"
+        ) from err
+
+    africa_america_cap_raw = os.getenv("AFRICA_AMERICA_PRICE_CAP", str(AFRICA_AMERICA_PRICE_CAP)).strip()
+    try:
+        africa_america_price_cap = float(africa_america_cap_raw)
+    except ValueError as err:
+        raise ValueError(
+            f"Invalid float for AFRICA_AMERICA_PRICE_CAP: '{africa_america_cap_raw}'"
+        ) from err
+
     timeout_raw = os.getenv("REQUEST_TIMEOUT_SECONDS", "15").strip()
     try:
         request_timeout_seconds = int(timeout_raw)
@@ -159,6 +202,9 @@ def load_settings(env_file: Optional[Path] = None) -> Settings:
         api_endpoint_url=api_endpoint_url,
         rainbow_api_endpoint_url=rainbow_api_endpoint_url,
         tui_api_endpoint_url=tui_api_endpoint_url,
+        max_days_ahead=max_days_ahead,
+        asia_price_cap=asia_price_cap,
+        africa_america_price_cap=africa_america_price_cap,
         request_timeout_seconds=request_timeout_seconds,
         max_retries=max_retries,
         retry_backoff_factor=retry_backoff_factor,

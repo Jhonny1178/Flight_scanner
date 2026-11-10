@@ -1,5 +1,6 @@
 """End-to-end unit tests for FlightScannerEngine orchestration."""
 
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 from flight_scanner.main import FlightScannerEngine, ProviderTask
 from flight_scanner.core.filter import FlightFilter
@@ -10,14 +11,17 @@ from flight_scanner.parsers.tui_parser import TUICharterParser
 
 def test_engine_single_parser_orchestration():
     mock_fetcher = MagicMock()
+    now = datetime.now()
+    valid_date = (now + timedelta(days=7)).strftime("%Y-%m-%d")
+
     mock_fetcher.fetch_json.return_value = {
         "offers": [
             {
                 "id": "deal-1",
                 "origin": "WAW",
-                "destination": "AYT",
-                "departure_date": "2026-06-15",
-                "price": 350.0,
+                "destination": "BKK",
+                "departure_date": valid_date,
+                "price": 450.0,
                 "currency": "PLN",
                 "operator": "Charter",
                 "url": "https://example.com/1",
@@ -25,9 +29,9 @@ def test_engine_single_parser_orchestration():
             {
                 "id": "deal-2",
                 "origin": "WAW",
-                "destination": "BCN",
-                "departure_date": "2026-06-15",
-                "price": 850.0,  # Exceeds threshold
+                "destination": "BKK",
+                "departure_date": valid_date,
+                "price": 850.0,  # Exceeds custom filter threshold 500.0
                 "currency": "PLN",
                 "operator": "Charter",
                 "url": "https://example.com/2",
@@ -61,6 +65,9 @@ def test_engine_single_parser_orchestration():
 
 def test_engine_multi_provider_rainbow_and_tui():
     mock_fetcher = MagicMock()
+    now = datetime.now()
+    valid_date_rainbow = (now + timedelta(days=5)).strftime("%Y-%m-%dT00:00:00Z")
+    valid_date_tui = (now + timedelta(days=10)).strftime("%Y-%m-%d")
 
     def mock_fetch_side_effect(url, **kwargs):
         if "r.pl" in url:
@@ -69,11 +76,11 @@ def test_engine_multi_provider_rainbow_and_tui():
                     {
                         "Nazwa": "Zanzibar",
                         "Klucz": "ZNZ",
-                        "TerminWyjazdu": "2026-10-31T00:00:00Z",
-                        "Cena": 1450,  # Below 2500
+                        "TerminWyjazdu": valid_date_rainbow,
+                        "Cena": 1450,  # Below 1500 Africa cap
                         "DataLayer": {
                             "brand": "Enter Air",
-                            "name": "Zanzibar KTW - ZNZ 31/10/2026",
+                            "name": "Zanzibar KTW - ZNZ",
                             "id": 1,
                         },
                     }
@@ -85,9 +92,10 @@ def test_engine_multi_provider_rainbow_and_tui():
                     {
                         "id": "tui-1",
                         "departureAirport": "WAW",
-                        "arrivalAirport": "CUN",
-                        "departureDate": "2026-06-15",
-                        "price": 1820.0,  # Below 2500
+                        "arrivalAirport": "BKK",
+                        "destination": "Bangkok",
+                        "departureDate": valid_date_tui,
+                        "price": 890.0,  # Below 1000 Asia cap
                         "currency": "PLN",
                         "operator": "TUI Charter",
                     }
@@ -106,6 +114,11 @@ def test_engine_multi_provider_rainbow_and_tui():
         parser=RainbowCharterParser(),
         url="https://r.pl/api/czartery/wyszukiwanie/v4.1/wyszukaj",
         method="GET",
+        params={
+            "oneWay": "true",
+            "dataUrodzenia": "1996-10-26",
+            "sortowanie": "cena",
+        },
         send_cookies=False,
     )
     tui_task = ProviderTask(

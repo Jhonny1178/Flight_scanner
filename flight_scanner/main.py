@@ -11,6 +11,7 @@ import argparse
 import logging
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -172,10 +173,12 @@ class FlightScannerEngine:
 
         if not matching_deals:
             logger.info(
-                "None of the %d total offers matched the price threshold (<= %.2f %s).",
+                "None of the %d total offers matched the last-minute + regional price filters "
+                "(Asia <= %.0f PLN, Africa/Americas <= %.0f PLN, window <= %d days).",
                 len(all_parsed_offers),
-                self.filter.price_threshold,
-                "PLN",
+                self.filter.asia_price_cap,
+                self.filter.africa_america_price_cap,
+                self.filter.max_days_ahead,
             )
             metrics["success"] = True
             return metrics
@@ -191,9 +194,13 @@ class FlightScannerEngine:
             )
             for deal in matching_deals:
                 route_str = deal.get("route") or f"{deal.get('origin')} -> {deal.get('destination')}"
+                region = deal.get("_region", "UNKNOWN")
+                region_cap = deal.get("_region_cap", "?")
                 print(
                     f"-> [DEAL] {route_str} "
-                    f"| {deal.get('departure_date')} | {deal.get('price'):.2f} {deal.get('currency')} "
+                    f"| {deal.get('departure_date')} "
+                    f"| {deal.get('price'):.2f} {deal.get('currency')} "
+                    f"| Region: {region} (cap: {region_cap}) "
                     f"| {deal.get('airline_or_operator')}"
                 )
 
@@ -214,46 +221,53 @@ def setup_logging(log_level: str = "INFO") -> None:
 
 def build_sample_mock_data() -> Dict[str, Any]:
     """Provides synthetic payloads simulating exotic long-haul and excluded short-haul offers."""
+    now = datetime.now()
     return {
         "rainbow": {
             "Destynacje": [
                 {
                     "Panstwo": "Tanzania",
                     "Nazwa": "Zanzibar",
+                    "PanstwoUrl": "tanzania",
+                    "NazwaUrl": "zanzibar",
                     "Klucz": "ZNZ",
-                    "TerminWyjazdu": "2026-11-15T00:00:00Z",
-                    "Cena": 1899,  # Qualifying exotic long-haul below 2500 threshold
+                    "TerminWyjazdu": (now + timedelta(days=7)).strftime("%Y-%m-%dT00:00:00Z"),
+                    "Cena": 1399,  # Qualifying exotic Africa long-haul below 1500 cap
                     "DataLayer": {
                         "brand": "Enter Air",
                         "id": 501,
-                        "name": "Zanzibar WAW - ZNZ 15/11/2026",
-                        "price": 1899,
+                        "name": "Zanzibar WAW - ZNZ",
+                        "price": 1399,
                     },
                 },
                 {
                     "Panstwo": "Portugalia",
                     "Nazwa": "Madera",
+                    "PanstwoUrl": "portugalia",
+                    "NazwaUrl": "madera",
                     "Klucz": "FNC",
-                    "TerminWyjazdu": "2026-10-31T00:00:00Z",
-                    "Cena": 749,  # Below 2500, but excluded as short-haul (Madera keyword)
+                    "TerminWyjazdu": (now + timedelta(days=5)).strftime("%Y-%m-%dT00:00:00Z"),
+                    "Cena": 749,  # Below cap, but excluded as short-haul (Madera keyword)
                     "DataLayer": {
                         "brand": "Enter Air",
                         "id": 502,
-                        "name": "Madera KTW - FNC 31/10/2026",
+                        "name": "Madera KTW - FNC",
                         "price": 749,
                     },
                 },
                 {
                     "Panstwo": "Kenia",
                     "Nazwa": "Mombasa",
+                    "PanstwoUrl": "kenia",
+                    "NazwaUrl": "mombasa",
                     "Klucz": "MBA",
-                    "TerminWyjazdu": "2026-11-20T00:00:00Z",
-                    "Cena": 2999,  # Long-haul, but exceeds 2500 price threshold
+                    "TerminWyjazdu": (now + timedelta(days=10)).strftime("%Y-%m-%dT00:00:00Z"),
+                    "Cena": 1899,  # Long-haul, but exceeds 1500 Africa cap
                     "DataLayer": {
                         "brand": "Enter Air",
                         "id": 503,
-                        "name": "Mombasa KTW - MBA 20/11/2026",
-                        "price": 2999,
+                        "name": "Mombasa KTW - MBA",
+                        "price": 1899,
                     },
                 },
             ]
@@ -261,15 +275,15 @@ def build_sample_mock_data() -> Dict[str, Any]:
         "tui": {
             "offers": [
                 {
-                    "id": "tui-cun-001",
+                    "id": "tui-bkk-001",
                     "departureAirport": "WAW",
-                    "arrivalAirport": "CUN",
-                    "destination": "Cancun",
-                    "departureDate": "2026-11-25",
-                    "price": 2199.00,  # Qualifying long-haul below 2500 threshold
+                    "arrivalAirport": "BKK",
+                    "destination": "Bangkok",
+                    "departureDate": (now + timedelta(days=12)).strftime("%Y-%m-%d"),
+                    "price": 950.00,  # Qualifying Asia long-haul below 1000 threshold
                     "currency": "PLN",
                     "operator": "TUI Charter",
-                    "booking_url": "https://www.tui.pl/bilety-czarterowe/cun",
+                    "booking_url": "https://www.tui.pl/bilety-lotnicze?q=BKK",
                 },
                 {
                     "id": "tui-ayt-002",
@@ -277,11 +291,11 @@ def build_sample_mock_data() -> Dict[str, Any]:
                     "arrivalAirport": "AYT",
                     "destination": "Antalya",
                     "route": "Antalya WAW - AYT",
-                    "departureDate": "2026-11-10",
-                    "price": 450.00,  # Below 2500, but excluded as short-haul (Antalya keyword)
+                    "departureDate": (now + timedelta(days=5)).strftime("%Y-%m-%d"),
+                    "price": 450.00,  # Excluded as short-haul (Turkey/Antalya)
                     "currency": "PLN",
                     "operator": "TUI Charter",
-                    "booking_url": "https://www.tui.pl/bilety-czarterowe/ayt",
+                    "booking_url": "https://www.tui.pl/bilety-lotnicze?q=AYT",
                 },
             ]
         },
@@ -328,7 +342,7 @@ def main() -> int:
         url=settings.rainbow_api_endpoint_url,
         method="GET",
         params={
-            "oneWay": "false",
+            "oneWay": "true",
             "dataUrodzenia": "1996-10-26",
             "sortowanie": "cena",
         },
@@ -359,7 +373,12 @@ def main() -> int:
         max_retries=settings.max_retries,
         retry_backoff_factor=settings.retry_backoff_factor,
     ) as fetcher:
-        flight_filter = FlightFilter(price_threshold=settings.price_threshold)
+        flight_filter = FlightFilter(
+            price_threshold=settings.price_threshold,
+            max_days_ahead=settings.max_days_ahead,
+            asia_price_cap=settings.asia_price_cap,
+            africa_america_price_cap=settings.africa_america_price_cap,
+        )
         notifier = TelegramNotifier(
             token=settings.telegram_token,
             chat_id=settings.chat_id,

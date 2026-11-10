@@ -1,7 +1,7 @@
 """Unit tests for settings and environment loading."""
 
 import pytest
-from flight_scanner.config.settings import Settings, load_settings
+from flight_scanner.config.settings import Settings, load_settings, MAX_DAYS_AHEAD, ASIA_PRICE_CAP, AFRICA_AMERICA_PRICE_CAP
 
 
 def test_settings_validation_success():
@@ -14,6 +14,18 @@ def test_settings_validation_success():
     settings.validate()
     assert settings.is_telegram_configured() is True
     assert settings.price_threshold == 450.0
+
+
+def test_settings_default_regional_caps():
+    settings = Settings(
+        telegram_token="",
+        chat_id="",
+        price_threshold=2500.0,
+        api_endpoint_url="https://api.example.com/flights",
+    )
+    assert settings.max_days_ahead == MAX_DAYS_AHEAD == 21
+    assert settings.asia_price_cap == ASIA_PRICE_CAP == 1000.0
+    assert settings.africa_america_price_cap == AFRICA_AMERICA_PRICE_CAP == 1500.0
 
 
 def test_settings_validation_invalid_price():
@@ -36,6 +48,30 @@ def test_settings_validation_invalid_timeout():
         request_timeout_seconds=0,
     )
     with pytest.raises(ValueError, match="REQUEST_TIMEOUT_SECONDS must be positive"):
+        settings.validate()
+
+
+def test_settings_validation_invalid_asia_cap():
+    settings = Settings(
+        telegram_token="",
+        chat_id="",
+        price_threshold=2500.0,
+        api_endpoint_url="https://api.example.com/flights",
+        asia_price_cap=-50.0,
+    )
+    with pytest.raises(ValueError, match="ASIA_PRICE_CAP must be positive"):
+        settings.validate()
+
+
+def test_settings_validation_invalid_africa_america_cap():
+    settings = Settings(
+        telegram_token="",
+        chat_id="",
+        price_threshold=2500.0,
+        api_endpoint_url="https://api.example.com/flights",
+        africa_america_price_cap=0.0,
+    )
+    with pytest.raises(ValueError, match="AFRICA_AMERICA_PRICE_CAP must be positive"):
         settings.validate()
 
 
@@ -68,3 +104,17 @@ def test_load_settings_telegram_bot_token_and_chat_id(monkeypatch):
     settings = load_settings()
     assert settings.telegram_token == "bot_token_via_gh_secret"
     assert settings.chat_id == "chat_id_via_gh_secret"
+
+
+def test_load_settings_custom_regional_caps(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_TOKEN", "tok")
+    monkeypatch.setenv("CHAT_ID", "1")
+    monkeypatch.setenv("ASIA_PRICE_CAP", "800.0")
+    monkeypatch.setenv("AFRICA_AMERICA_PRICE_CAP", "1200.0")
+    monkeypatch.setenv("MAX_DAYS_AHEAD", "14")
+
+    settings = load_settings()
+    assert settings.asia_price_cap == 800.0
+    assert settings.africa_america_price_cap == 1200.0
+    assert settings.max_days_ahead == 14
+

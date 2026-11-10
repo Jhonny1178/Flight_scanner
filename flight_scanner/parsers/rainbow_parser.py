@@ -103,7 +103,18 @@ class RainbowCharterParser(BaseFlightParser):
                 brand = str(data_layer_dict.get("brand") or "").strip()
                 operator = f"Rainbow ({brand})" if brand else "Rainbow"
 
-                # 5. Identifier & URL
+                # 5. Identifier & Dynamic Deep Link URL
+                airport_code = str(item.get("Klucz") or destination or "").strip().upper()
+                panstwo_url = str(item.get("PanstwoUrl") or "").strip().strip("/")
+                nazwa_url = str(item.get("NazwaUrl") or "").strip().strip("/")
+
+                if panstwo_url and nazwa_url:
+                    deal_url = f"https://r.pl/bilety-czarterowe/{panstwo_url}/{nazwa_url}"
+                elif airport_code:
+                    deal_url = f"https://r.pl/bilety-czarterowe/szukaj?przylot={airport_code}"
+                else:
+                    deal_url = self.BOOKING_SEARCH_URL
+
                 dl_id = data_layer_dict.get("id")
                 offer_id = (
                     f"rainbow_{dl_id}"
@@ -122,8 +133,12 @@ class RainbowCharterParser(BaseFlightParser):
                     "currency": "PLN",
                     "operator": operator,
                     "airline_or_operator": operator,
-                    "url": self.BOOKING_SEARCH_URL,
-                    "booking_url": self.BOOKING_SEARCH_URL,
+                    "url": deal_url,
+                    "booking_url": deal_url,
+                    "Panstwo": item.get("Panstwo"),
+                    "Nazwa": item.get("Nazwa"),
+                    "PanstwoUrl": item.get("PanstwoUrl"),
+                    "NazwaUrl": item.get("NazwaUrl"),
                 }
                 parsed_offers.append(offer)
 
